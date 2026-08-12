@@ -240,32 +240,26 @@ The trade-off in one line: Gson feels more "automatic" since it needs zero
 annotations for the simple case, but that's exactly why it can fail silently
 at runtime. Ktor makes you be explicit every time, but the compiler checks it.
 
-## Advantages and disadvantages
+## Core differences (interview-ready summary)
 
-**Ktor**
+| Aspect | Retrofit | Ktor |
+|---|---|---|
+| Built by | Square | JetBrains |
+| Platform support | Android / JVM only | Multiplatform — Android, iOS, desktop, backend |
+| How you define API calls | Interface + annotations (`@GET`, `@POST`, etc.) | Plain suspend functions calling `client.get()`, `client.post()`, etc. |
+| How the call is implemented | Retrofit generates the implementation for you at runtime | You write the implementation yourself, nothing generated |
+| Networking engine | Always uses OkHttp underneath | You choose the engine (Android, OkHttp, CIO, Darwin, etc.) |
+| JSON conversion | A converter (usually Gson or Moshi) using runtime reflection | `kotlinx.serialization`, using compile-time generated serializers |
+| Annotation needed on data class | Not required for the simple case | `@Serializable` required on every class |
+| Extra features (logging, timeout, auth) | Added via OkHttp interceptors | Added via Ktor plugins (`install(...)`) |
+| Setup style | One builder call (`Retrofit.Builder()`) sets nearly everything up | You assemble the client piece by piece (engine + each plugin) |
+| Maturity / community | Older, very widely used, huge amount of documentation online | Newer, smaller community, growing fast especially with Kotlin Multiplatform |
+| Best fit | Android-only apps wanting the fastest, most conventional setup | Apps that need multiplatform code sharing, or want full control over the HTTP client |
 
-| Advantages | Disadvantages |
-|---|---|
-| Pure Kotlin, built by JetBrains — coroutines and Kotlin idioms feel native, not bolted on | More setup: you assemble the client yourself (engine + plugins) instead of one builder call |
-| Multiplatform — the same client code can run on Android, iOS, desktop, backend (KMP) | Smaller community than Retrofit, so fewer StackOverflow answers / blog posts when you get stuck |
-| Nothing is hidden — you can see exactly how the request is built and the response parsed | No code generation means slightly more boilerplate per API call (you write the function body yourself) |
-| Plugins are swappable/composable — pick only what you need (logging, timeout, auth, caching, etc.) | Being younger than Retrofit, occasional breaking changes across major versions |
-| Same library can also power a backend server (Ktor is a server framework too) | Learning curve is steeper up front, exactly what you're currently going through |
-
-**Retrofit**
-
-| Advantages | Disadvantages |
-|---|---|
-| Mature, extremely widely used — huge amount of documentation, tutorials, StackOverflow answers | Android/JVM only — can't reuse the same API layer on iOS or a Kotlin backend |
-| Very little boilerplate — an interface with annotations is often enough | Code generation makes the "magic" harder to trace when something goes wrong |
-| Battle-tested in production across huge numbers of apps | Tied to OkHttp underneath — less flexibility in choosing a different networking engine |
-| Converter system (Gson/Moshi/kotlinx-serialization) is a well-known, simple concept | Coroutine support is good but was added on top of a callback-based design, not built around it from the start |
-
-Neither is "better" in general — Retrofit is the safer default for a typical
-Android-only app today, Ktor is the natural choice once multiplatform or deep
-control over the HTTP client matters. Learning Ktor (which is what this
-project is for) also makes Retrofit's abstractions easier to understand,
-since you've now built by hand what Retrofit normally does for you.
+The one-line way to say it in an interview: **Retrofit is annotation-driven
+with code generation and a fixed OkHttp engine; Ktor is a plain Kotlin
+suspend-function API built from a client you configure yourself, plugin by
+plugin, and it works across platforms, not just Android.**
 
 ## Core keyword glossary
 
