@@ -193,6 +193,53 @@ underneath, which is exactly why this project keeps Ktor contained to
 | Getting the result | Function call returns the parsed object directly | `client.get(...)` returns a response; you call `.body<T>()` to parse it |
 | Code generation | Yes (Retrofit generates the interface implementation) | No — you write the actual calling code yourself |
 
+### How JSON <-> Kotlin object conversion actually works in each
+
+This is one of the more conceptually different parts between the two, and
+worth calling out on its own since it's easy to assume they work the same way.
+
+**Retrofit + Gson:** conversion happens through **reflection at runtime**.
+`GsonConverterFactory` inspects your data class's fields by name when the
+response arrives and matches them against the JSON keys. No annotation is
+required on the class for the simple case — a plain data class just works.
+You only add `@SerializedName("json_key")` when the JSON key doesn't match
+your Kotlin field name.
+
+**Ktor + kotlinx.serialization:** conversion happens through **serializers
+generated at compile time**, via two pieces working together:
+
+1. The `ContentNegotiation` plugin (installed on the `HttpClient` in
+   `NetworkModule.kt`) looks at the response's `Content-Type` header and
+   decides which serializer should handle the raw bytes.
+2. `kotlinx.serialization` is the library that actually does the conversion.
+   Every class you want (de)serialized **must** be marked `@Serializable` —
+   this isn't optional the way Gson's annotations are. Without it, the
+   `kotlin("plugin.serialization")` Gradle plugin has nothing to generate a
+   serializer for, and `.body<MealDto>()` won't compile. Just like Gson's
+   `@SerializedName`, you add `@SerialName("json_key")` when the JSON key
+   doesn't match your field name — see `MealDto.kt`:
+
+```kotlin
+@Serializable                              // required, always
+data class MealDto(
+    @SerialName("idMeal") val id: String,  // needed only because "idMeal" != "id"
+    @SerialName("strMeal") val name: String
+)
+```
+
+| | Gson (Retrofit) | kotlinx.serialization (Ktor) |
+|---|---|---|
+| Mechanism | Runtime reflection | Compile-time generated serializers |
+| Annotation on the class | Not required for the simple case | `@Serializable` required on every DTO |
+| Field-name mismatch | `@SerializedName("json_key")` | `@SerialName("json_key")` |
+| Speed | Slower (reflection overhead) | Faster (no reflection) |
+| Safety | Mismatches can fail silently at runtime | Mismatches are often caught at compile time |
+| Two-way (request + response) | Same converter handles both | Same — `ContentNegotiation` handles both |
+
+The trade-off in one line: Gson feels more "automatic" since it needs zero
+annotations for the simple case, but that's exactly why it can fail silently
+at runtime. Ktor makes you be explicit every time, but the compiler checks it.
+
 ## Advantages and disadvantages
 
 **Ktor**
@@ -263,3 +310,4 @@ since you've now built by hand what Retrofit normally does for you.
   Ktor's auth handling instead of Retrofit's `Interceptor`.
 - Write a `FakeMealRepository : MealRepository` for a Compose `@Preview` — this
   is the payoff of having the domain interface at all.
+  
