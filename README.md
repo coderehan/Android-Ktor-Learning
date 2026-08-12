@@ -193,6 +193,69 @@ underneath, which is exactly why this project keeps Ktor contained to
 | Getting the result | Function call returns the parsed object directly | `client.get(...)` returns a response; you call `.body<T>()` to parse it |
 | Code generation | Yes (Retrofit generates the interface implementation) | No — you write the actual calling code yourself |
 
+## Advantages and disadvantages
+
+**Ktor**
+
+| Advantages | Disadvantages |
+|---|---|
+| Pure Kotlin, built by JetBrains — coroutines and Kotlin idioms feel native, not bolted on | More setup: you assemble the client yourself (engine + plugins) instead of one builder call |
+| Multiplatform — the same client code can run on Android, iOS, desktop, backend (KMP) | Smaller community than Retrofit, so fewer StackOverflow answers / blog posts when you get stuck |
+| Nothing is hidden — you can see exactly how the request is built and the response parsed | No code generation means slightly more boilerplate per API call (you write the function body yourself) |
+| Plugins are swappable/composable — pick only what you need (logging, timeout, auth, caching, etc.) | Being younger than Retrofit, occasional breaking changes across major versions |
+| Same library can also power a backend server (Ktor is a server framework too) | Learning curve is steeper up front, exactly what you're currently going through |
+
+**Retrofit**
+
+| Advantages | Disadvantages |
+|---|---|
+| Mature, extremely widely used — huge amount of documentation, tutorials, StackOverflow answers | Android/JVM only — can't reuse the same API layer on iOS or a Kotlin backend |
+| Very little boilerplate — an interface with annotations is often enough | Code generation makes the "magic" harder to trace when something goes wrong |
+| Battle-tested in production across huge numbers of apps | Tied to OkHttp underneath — less flexibility in choosing a different networking engine |
+| Converter system (Gson/Moshi/kotlinx-serialization) is a well-known, simple concept | Coroutine support is good but was added on top of a callback-based design, not built around it from the start |
+
+Neither is "better" in general — Retrofit is the safer default for a typical
+Android-only app today, Ktor is the natural choice once multiplatform or deep
+control over the HTTP client matters. Learning Ktor (which is what this
+project is for) also makes Retrofit's abstractions easier to understand,
+since you've now built by hand what Retrofit normally does for you.
+
+## Core keyword glossary
+
+- **HttpClient** — the Ktor object that actually sends requests. Roughly
+  equivalent to Retrofit's `Retrofit` instance, but you configure it directly
+  instead of through a builder with a base URL.
+- **Engine** — the underlying library that performs the real network I/O
+  (`Android`, `OkHttp`, `CIO`, `Darwin` for iOS, etc.). Retrofit uses OkHttp
+  as its engine always; Ktor lets you choose.
+- **Plugin** (formerly called "Feature" in Ktor 1.x) — an optional capability
+  you `install()` into the `HttpClient`, e.g. `ContentNegotiation` (JSON),
+  `Logging`, `HttpTimeout`, `Auth`. Comparable to Retrofit's converters and
+  OkHttp interceptors, but built into Ktor's own plugin system.
+- **ContentNegotiation** — the plugin that automatically converts between
+  JSON and Kotlin objects, based on which serializer you configure (this
+  project uses `kotlinx.serialization`). Equivalent to Retrofit's
+  `GsonConverterFactory` / `MoshiConverterFactory`.
+- **kotlinx.serialization** — JetBrains' own Kotlin serialization library.
+  You mark a class `@Serializable` (see `MealDto.kt`) instead of relying on
+  reflection like Gson does. Needs its own Gradle plugin
+  (`kotlin("plugin.serialization")`), which is why this project's root
+  `build.gradle.kts` has that extra plugin line.
+- **Request builder lambda** — the `{ ... }` block after `client.get(url)`,
+  where you add query parameters, headers, or a request body before it's
+  sent. There's no equivalent syntax in Retrofit — parameters are declared
+  via annotations like `@Query` on the interface method instead.
+- **`.body<T>()`** — the call that takes Ktor's raw `HttpResponse` and
+  deserializes it into your data class `T`. This is the step Retrofit does
+  invisibly for you the moment you call an interface function.
+- **DTO (Data Transfer Object)** — a class shaped exactly like the raw API
+  JSON (see `MealDto.kt`). Used in both Retrofit and Ktor projects; not a
+  Ktor-specific concept, but worth knowing since it's what `.body<T>()`
+  deserializes into here.
+- **Suspend function** — an ordinary Kotlin coroutine function that can
+  pause without blocking a thread. Both Ktor and modern Retrofit use suspend
+  functions for network calls; this part is identical between the two.
+
 ## Next experiments
 
 - Swap `Android` engine for `OkHttp` in `NetworkModule.kt` — one-line change.
